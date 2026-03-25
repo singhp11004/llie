@@ -11,15 +11,13 @@ class ImageProcessor:
         self.model_manager = model_manager
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # Define image preprocessing transforms
+        # Define image preprocessing transforms for ZeroDCE [0, 1]
         self.transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ])
         
         # Define inverse transform for output
         self.inverse_transform = transforms.Compose([
-            transforms.Normalize(mean=[-1, -1, -1], std=[2, 2, 2]),
             transforms.ToPILImage()
         ])
 
@@ -81,21 +79,14 @@ class ImageProcessor:
 
     async def apply_enhancement(self, input_tensor, model, model_id):
         """
-        Apply enhancement using the model
-        This is a placeholder implementation - you'll need to adapt based on your model architecture
+        Apply enhancement using the real Deep Neural Network model
         """
         try:
             with torch.no_grad():
-                # For now, we'll use a simple brightness/contrast enhancement
-                # In a real implementation, you would use: enhanced = model(input_tensor)
-                
-                # Simple enhancement as fallback
-                enhanced = self.simple_enhancement(input_tensor)
-                
+                enhanced = model(input_tensor)
                 return enhanced
-                
         except Exception as e:
-            # Fallback to simple enhancement if model fails
+            # Fallback to simple enhancement if model fails (e.g. OOM)
             print(f"Model processing failed, using fallback: {e}")
             return self.simple_enhancement(input_tensor)
 
@@ -112,8 +103,8 @@ class ImageProcessor:
         # Contrast adjustment
         enhanced = (enhanced - 0.5) * 1.2 + 0.5
         
-        # Clamp values to valid range
-        enhanced = torch.clamp(enhanced, -1, 1)
+        # Clamp values to valid range [0, 1] for ToPILImage
+        enhanced = torch.clamp(enhanced, 0.0, 1.0)
         
         return enhanced
 

@@ -163,7 +163,7 @@ The frontend will be available at `http://localhost:5173`
 ### Backend Issues
 
 - **Port 8000 already in use**: Change the port in `start_server.py`
-- **Model loading errors**: Ensure all model files are present in the `trained_models` directory
+- **Model loading errors**: Ensure all model files are present in the `trained_models` directory. **Note: Currently, the pre-trained weights for the `LOL_real` model are missing from the `backend/trained_models_SMG_Low_Light_Enhancement/trained_models/LOL_real/` directory. You must supply a trained `model.pt` file for the AI enhancement to work, otherwise the system will use a simple brightness/contrast fallback.**
 - **Python dependencies**: Make sure all packages are installed correctly
 
 ### Frontend Issues

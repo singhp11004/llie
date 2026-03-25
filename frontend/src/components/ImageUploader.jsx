@@ -36,7 +36,7 @@ const ImageUploader = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
@@ -59,11 +59,6 @@ const ImageUploader = () => {
   };
 
   const handleUpload = async () => {
-    if (!user) {
-      alert('Please login to upload images');
-      return;
-    }
-
     if (!selectedFile) return;
 
     const result = await processImage(selectedFile);
@@ -109,12 +104,12 @@ const ImageUploader = () => {
             onChange={handleChange}
             className="upload-input"
           />
-          
+
           <div className="upload-content">
             <div className="upload-icon-container">
               <Upload className="upload-icon" />
             </div>
-            
+
             <div className="upload-text">
               <h3 className="upload-title">
                 Upload Your Low Light Image
@@ -126,7 +121,7 @@ const ImageUploader = () => {
                 Supports JPG, PNG, WebP up to 10MB
               </p>
             </div>
-            
+
             <button className="btn-primary upload-button">
               Choose File
             </button>
@@ -145,7 +140,7 @@ const ImageUploader = () => {
               <X className="selected-image-close-icon" />
             </button>
           </div>
-          
+
           <div className="selected-image-grid">
             <div className="selected-image-preview">
               <img
@@ -155,19 +150,18 @@ const ImageUploader = () => {
               />
               <p className="selected-image-label">Original Image</p>
             </div>
-            
+
             <div className="selected-image-actions">
               <div className="selected-image-placeholder">
                 <ImageIcon className="selected-image-placeholder-icon" />
                 <p className="selected-image-placeholder-text">Enhanced image will appear here</p>
               </div>
-              
+
               <button
                 onClick={handleUpload}
                 className="btn-primary selected-image-enhance"
-                disabled={!user}
               >
-                {!user ? 'Login Required' : 'Enhance Image'}
+                Enhance Image
               </button>
             </div>
           </div>
@@ -202,7 +196,7 @@ const ImageUploader = () => {
               <X className="result-close-icon" />
             </button>
           </div>
-          
+
           <div className="result-grid">
             <div className="result-image-container">
               <img
@@ -212,7 +206,7 @@ const ImageUploader = () => {
               />
               <p className="result-image-label">Original Image</p>
             </div>
-            
+
             <div className="result-image-container">
               <img
                 src={result.enhancedUrl}
@@ -222,7 +216,7 @@ const ImageUploader = () => {
               <p className="result-image-label">Enhanced Image</p>
             </div>
           </div>
-          
+
           <div className="result-download">
             <button
               onClick={() => downloadImage(result.enhancedUrl, result.originalName)}

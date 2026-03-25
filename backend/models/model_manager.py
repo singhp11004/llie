@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 import os
+from models.architecture.zero_dce import ZeroDCE
 
 class ModelManager:
     def __init__(self):
@@ -16,18 +17,31 @@ class ModelManager:
         """Load all available models"""
         for model_id, model_path in self.model_paths.items():
             try:
+                # Always instantiate the architecture first
+                model = ZeroDCE()
+                
                 if os.path.exists(model_path):
-                    # Load the model
-                    model = torch.load(model_path, map_location=self.device)
-                    if isinstance(model, dict):
-                        # If it's a state dict, we need to create the model architecture first
-                        # For now, we'll assume the model is already complete
-                        self.models[model_id] = model
+                    # Load the state dict
+                    state_dict = torch.load(model_path, map_location=self.device)
+                    # Handle 'module.' prefix if saved with DataParallel
+                    if isinstance(state_dict, dict):
+                        if any(k.startswith('module.') for k in state_dict.keys()):
+                            state_dict = {k[7:]: v for k, v in state_dict.items()}
+                        try:
+                            model.load_state_dict(state_dict)
+                        except Exception as e:
+                            print(f"Error loading state dict, structure mismatch? {e}")
                     else:
-                        self.models[model_id] = model
-                    print(f"Loaded {model_id} model successfully")
+                        print("Warning: loaded object is not a state dict. Attempting to use directly.")
+                        model = state_dict # Fallback
                 else:
-                    print(f"Model file not found: {model_path}")
+                    print(f"Warning: Model file not found at {model_path}. Using uninitialized model.")
+                
+                model.eval()
+                model.to(self.device)
+                self.models[model_id] = model
+                print(f"Loaded {model_id} model successfully")
+                
             except Exception as e:
                 print(f"Error loading {model_id} model: {e}")
 

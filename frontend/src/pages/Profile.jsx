@@ -59,7 +59,7 @@ const Profile = () => {
               <h1 className="profile-name">{user.name}</h1>
               <p className="profile-email">{user.email}</p>
               <p className="profile-member-since">
-                Member since {new Date(user.createdAt).toLocaleDateString()}
+                Member since {new Date(user.created_at).toLocaleDateString()}
               </p>
             </div>
           </div>
@@ -118,7 +118,7 @@ const Profile = () => {
                       <span>{getTimeRemaining(image.uploadedAt)}</span>
                     </div>
                   </div>
-                  
+
                   <div className="profile-image-details">
                     <div className="profile-image-info">
                       <h3 className="profile-image-name">{image.originalName}</h3>
@@ -126,7 +126,7 @@ const Profile = () => {
                         {formatFileSize(image.size)} • {new Date(image.uploadedAt).toLocaleDateString()}
                       </p>
                     </div>
-                    
+
                     <div className="profile-image-actions">
                       <button
                         onClick={() => downloadImage(image.enhancedUrl, image.originalName)}

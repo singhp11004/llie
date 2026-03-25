@@ -20,9 +20,10 @@ from models.auth_manager import AuthManager
 app = FastAPI(title="ChandraGrahan Low Light Enhancement API", version="1.0.0")
 
 # CORS middleware
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Add your frontend URLs
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,8 +34,10 @@ model_manager = ModelManager()
 image_processor = ImageProcessor(model_manager)
 auth_manager = AuthManager()
 
+from typing import Optional
+
 # Security
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Pydantic models
 class UserRegister(BaseModel):
@@ -62,7 +65,9 @@ async def startup_event():
         print(f"Error loading models: {e}")
 
 # Authentication dependency
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    if not credentials:
+        return None
     token = credentials.credentials
     user = auth_manager.verify_token(token)
     if not user:
@@ -137,7 +142,7 @@ async def get_available_models():
 @app.post("/enhance")
 async def enhance_image(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_current_user)
 ):
     """
     Enhance a low light image using the LOL Real model

@@ -616,7 +616,13 @@ p {
   background: #818cf8;
   height: 0.75rem;
   border-radius: 9999px;
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  width: 40%;
+  animation: indeterminate 1.5s infinite linear;
+}
+
+@keyframes indeterminate {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(350%); }
 }
 
 /* Result Styles */
