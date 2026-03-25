@@ -61,12 +61,12 @@ export const ImageProvider = ({ children }) => {
     });
   };
 
-  const processImage = async (file) => {
+  const processImage = async (file, modelId) => {
     setProcessing(true);
 
     try {
       // Call backend API for image enhancement
-      const result = await apiService.enhanceImage(file);
+      const result = await apiService.enhanceImage(file, modelId);
 
       if (result.success) {
         const originalUrl = URL.createObjectURL(file);
@@ -79,7 +79,7 @@ export const ImageProvider = ({ children }) => {
           uploadedAt: new Date().toISOString(),
           size: file.size,
           type: file.type,
-          modelUsed: "lol_real"
+          modelUsed: result.modelUsed || "lol_real"
         };
 
         const updatedImages = [...images, newImage];

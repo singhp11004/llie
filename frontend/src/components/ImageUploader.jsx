@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Image as ImageIcon, X, Download, Loader } from 'lucide-react';
+import { Upload, Image as ImageIcon, X, Download, Loader, Camera } from 'lucide-react';
+import CameraCapture from './CameraCapture';
+import ComparisonSlider from './ComparisonSlider';
 import { useImages } from '../contexts/ImageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { gsap } from 'gsap';
@@ -10,6 +12,9 @@ const ImageUploader = () => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [result, setResult] = useState(null);
+  const [inputMode, setInputMode] = useState('upload'); // 'upload' | 'camera'
+  const [selectedModel, setSelectedModel] = useState('lol_real');
+  const [availableModels, setAvailableModels] = useState([]);
   const fileInputRef = useRef();
   const uploaderRef = useRef();
 
@@ -20,6 +25,15 @@ const ImageUploader = () => {
         { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', delay: 0.3 }
       );
     }
+
+    // Fetch available models
+    import('../services/api').then(({ default: apiService }) => {
+      apiService.getAvailableModels().then(data => {
+        if (data && data.models) {
+          setAvailableModels(data.models);
+        }
+      });
+    });
   }, []);
 
   const handleDrag = (e) => {
@@ -61,7 +75,7 @@ const ImageUploader = () => {
   const handleUpload = async () => {
     if (!selectedFile) return;
 
-    const result = await processImage(selectedFile);
+    const result = await processImage(selectedFile, selectedModel);
     if (result.success) {
       setResult(result.image);
       setSelectedFile(null);
@@ -89,7 +103,27 @@ const ImageUploader = () => {
 
   return (
     <div ref={uploaderRef} className="image-uploader">
+
       {!selectedFile && !result && (
+        <div className="input-mode-tabs" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', justifyContent: 'center' }}>
+          <button
+            className={`tab btn-secondary ${inputMode === 'upload' ? 'active' : ''}`}
+            style={{ padding: '0.5rem 1.5rem', opacity: inputMode === 'upload' ? 1 : 0.6, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            onClick={() => setInputMode('upload')}
+          >
+            <Upload size={18} /> Upload File
+          </button>
+          <button
+            className={`tab btn-secondary ${inputMode === 'camera' ? 'active' : ''}`}
+            style={{ padding: '0.5rem 1.5rem', opacity: inputMode === 'camera' ? 1 : 0.6, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            onClick={() => setInputMode('camera')}
+          >
+            <Camera size={18} /> Use Camera
+          </button>
+        </div>
+      )}
+
+      {!selectedFile && !result && inputMode === 'upload' && (
         <div
           className={`upload-dropzone ${dragActive ? 'upload-dropzone-active' : ''}`}
           onDragEnter={handleDrag}
@@ -129,6 +163,12 @@ const ImageUploader = () => {
         </div>
       )}
 
+      {!selectedFile && !result && inputMode === 'camera' && (
+        <div className="card" style={{ padding: '2rem' }}>
+          <CameraCapture onCapture={handleFile} />
+        </div>
+      )}
+
       {selectedFile && !processing && !result && (
         <div className="card">
           <div className="selected-image-header">
@@ -157,9 +197,31 @@ const ImageUploader = () => {
                 <p className="selected-image-placeholder-text">Enhanced image will appear here</p>
               </div>
 
+              {availableModels.length > 0 && (
+                <div style={{ marginTop: '1rem', width: '100%' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#aaa' }}>Select Enhancement Model</label>
+                  <select
+                    value={selectedModel}
+                    onChange={e => setSelectedModel(e.target.value)}
+                    style={{
+                      width: '100%', padding: '0.75rem', paddingRight: '2.5rem',
+                      borderRadius: '8px', border: '1px solid #444',
+                      backgroundColor: '#2a2a2a', color: 'white',
+                      appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")',
+                      backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem top 50%', backgroundSize: '0.65rem auto'
+                    }}
+                  >
+                    {availableModels.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <button
                 onClick={handleUpload}
                 className="btn-primary selected-image-enhance"
+                style={{ marginTop: '1rem', width: '100%' }}
               >
                 Enhance Image
               </button>
@@ -197,24 +259,11 @@ const ImageUploader = () => {
             </button>
           </div>
 
-          <div className="result-grid">
-            <div className="result-image-container">
-              <img
-                src={result.originalUrl}
-                alt="Original"
-                className="result-image"
-              />
-              <p className="result-image-label">Original Image</p>
-            </div>
-
-            <div className="result-image-container">
-              <img
-                src={result.enhancedUrl}
-                alt="Enhanced"
-                className="result-image"
-              />
-              <p className="result-image-label">Enhanced Image</p>
-            </div>
+          <div style={{ margin: '1.5rem 0' }}>
+            <ComparisonSlider
+              originalSrc={result.originalUrl}
+              enhancedSrc={result.enhancedUrl}
+            />
           </div>
 
           <div className="result-download">

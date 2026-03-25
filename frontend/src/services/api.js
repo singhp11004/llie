@@ -131,9 +131,10 @@ class ApiService {
       };
     }
   }
-  async enhanceImage(file) {
+  async enhanceImage(file, modelId = "lol_real") {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('model_id', modelId);
 
     try {
       const headers = {};
@@ -162,13 +163,17 @@ class ApiService {
         fileId: result.file_id,
         originalFilename: result.original_filename,
         downloadUrl: `${API_BASE_URL}${result.download_url}`,
-        modelUsed: "lol_real"
+        modelUsed: result.model_used
       };
     } catch (error) {
       console.error('API Error:', error);
+      let errorMsg = error.message;
+      if (errorMsg === 'Failed to fetch') {
+        errorMsg = 'Cannot connect to the server. Please ensure the backend Python server is running.';
+      }
       return {
         success: false,
-        error: error.message || 'Network error occurred'
+        error: errorMsg || 'Network error occurred'
       };
     }
   }

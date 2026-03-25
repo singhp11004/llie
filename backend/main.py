@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, status
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,6 +12,16 @@ import shutil
 import json
 import hashlib
 import secrets
+import asyncio
+from PIL import Image
+
+try:
+    from skimage.metrics import peak_signal_noise_ratio as psnr
+    from skimage.metrics import structural_similarity as ssim
+    import numpy as np
+    HAS_SKIMAGE = True
+except ImportError:
+    HAS_SKIMAGE = False
 
 from models.image_processor import ImageProcessor
 from models.model_manager import ModelManager
@@ -20,10 +30,9 @@ from models.auth_manager import AuthManager
 app = FastAPI(title="ChandraGrahan Low Light Enhancement API", version="1.0.0")
 
 # CORS middleware
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex="https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,6 +64,22 @@ OUTPUT_DIR = Path("outputs")
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+
+async def cleanup_old_files_task():
+    """Background task to run cleanup every hour"""
+    while True:
+        try:
+            threshold = datetime.now() - timedelta(hours=24)
+            for path in UPLOAD_DIR.glob("*"):
+                if datetime.fromtimestamp(path.stat().st_mtime) < threshold:
+                    path.unlink()
+            for path in OUTPUT_DIR.glob("*"):
+                if datetime.fromtimestamp(path.stat().st_mtime) < threshold:
+                    path.unlink()
+        except Exception as e:
+            print(f"Cleanup error: {e}")
+        await asyncio.sleep(3600)  # Sleep for 1 hour
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize models on startup"""
@@ -63,6 +88,9 @@ async def startup_event():
         print("All models loaded successfully!")
     except Exception as e:
         print(f"Error loading models: {e}")
+    
+    # Start background cleanup task
+    asyncio.create_task(cleanup_old_files_task())
 
 # Authentication dependency
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
@@ -133,15 +161,45 @@ async def logout(current_user: dict = Depends(get_current_user)):
 @app.get("/models")
 async def get_available_models():
     """Get list of available models"""
-    return {
-        "models": [
-            {"id": "lol_real", "name": "LOL Real Dataset", "description": "Trained on real low light images"}
-        ]
-    }
+    models_list = []
+    # Real models dynamic listing
+    for m in model_manager.get_available_models():
+        models_list.append({
+            "id": m,
+            "name": m.replace("_", " ").title(),
+            "description": "Auto-detected model"
+        })
+    if not models_list:
+        models_list = [{"id": "lol_real", "name": "LOL Real Dataset", "description": "Fallback model"}]
+        
+    return {"models": models_list}
+
+def compute_metrics(original_path, enhanced_path):
+    if not HAS_SKIMAGE:
+        return None
+    try:
+        orig = np.array(Image.open(original_path).convert('RGB'))
+        enhanced = np.array(Image.open(enhanced_path).convert('RGB'))
+        
+        if orig.shape != enhanced.shape:
+            return None
+            
+        psnr_val = psnr(orig, enhanced, data_range=255)
+        ssim_val = ssim(orig, enhanced, channel_axis=2)
+        
+        return {
+            "psnr": round(float(psnr_val), 2),
+            "ssim": round(float(ssim_val), 4),
+            "improvement": f"+{psnr_val:.1f} dB"
+        }
+    except Exception as e:
+        print(f"Metrics error: {e}")
+        return None
 
 @app.post("/enhance")
 async def enhance_image(
     file: UploadFile = File(...),
+    model_id: str = Form("lol_real"),
     current_user: Optional[dict] = Depends(get_current_user)
 ):
     """
@@ -166,8 +224,10 @@ async def enhance_image(
         await image_processor.enhance_image(
             input_path=str(upload_path),
             output_path=str(output_path),
-            model_id="lol_real"
+            model_id=model_id if model_manager.is_model_loaded(model_id) else "lol_real"
         )
+        
+        metrics = compute_metrics(str(upload_path), str(output_path))
         
         # Return file info
         return {
@@ -175,7 +235,8 @@ async def enhance_image(
             "file_id": file_id,
             "original_filename": original_filename,
             "download_url": f"/download/{file_id}",
-            "model_used": "lol_real"
+            "model_used": model_id if model_manager.is_model_loaded(model_id) else "lol_real",
+            "metrics": metrics
         }
         
     except Exception as e:
